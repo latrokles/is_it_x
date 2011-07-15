@@ -12,7 +12,7 @@ def get_words(document):
     '''
     Return a list of unique words in document
     '''
-    regex1 = re.compile('\W')           # match non-alphanumeric
+    regex1 = re.compile('\(^[A-Za-z]\)*')          # match non-alphanumeric
     regex2 = re.compile('&(#)*(\w)*;')  # match html entities
     regex3 = re.compile('( ){2,}')      # match more than 2 spaces
     lemmatizer = WordNetLemmatizer()
@@ -26,12 +26,17 @@ def get_words(document):
             ]
     return FreqDist(words)
 
+def simple_get_words(document):
+    splitter = re.compile('\\W*')
+    words = [s.lower() for s in splitter.split(document) if len(s) > 2 and len(s)<20]
+    return dict([(w,1) for w in words])
+
 class Classifier(object):
     '''
     An implementation of a naive Bayes classifier based on the material from
     chapter 6 of O'Reilly's "Programming Collective Intelligence"
     '''
-    def __init__(self, get_features, filename=None):
+    def __init__(self, get_features):
         # keep track of the count for a given feature in each category
         self.feat_count = { }
         # keep track of the document count in each  category
@@ -99,6 +104,26 @@ class Classifier(object):
         # increment the count for cat
         self.increment_category(cat)
 
+    def train_from_file(self, filename, cat):
+        '''
+        Retrieve documents in training file (as single line entries) and train
+        the classifier with them.
+        '''
+        lines = [ ]
+        with codecs.open(filename, 'r', 'utf-8') as file:
+            lines = file.readlines()
+        for item in lines:
+            self.train(item.strip('\n'), cat)
+
+    def reset_classifier(self):
+        '''
+        Clears out feat_count and cat_count dictionaries. Very helpful for
+        testing and for use in the python shell
+        '''
+        self.feat_count = { }
+        self.cat_count  = { }
+        self.thresholds = { }
+
     # calculate probabilities
     def feature_probability(self, feat, cat):
         '''
@@ -107,7 +132,8 @@ class Classifier(object):
         if self.category_count(cat) == 0:
             return 0
         # total count of feat in cat / total count of items in cat
-        return self.feature_count(feat, cat) / self.category_count(cat)
+        feature_p = self.feature_count(feat, cat) / self.category_count(cat)
+        return feature_p
 
     def weighted_probability(self, feat, cat, weight=1.0, assumed_p=0.5):
         '''
@@ -119,7 +145,7 @@ class Classifier(object):
         # get a total count for this feature in all categories
         total_count = sum(
                           [
-                           self.feature_count(feat, cat)
+                           self.feature_count(feat, c)
                            for c in self.categories()
                           ]
                          )
@@ -134,14 +160,15 @@ class Classifier(object):
         features = self.get_features(document)
         p = 1
         # multiply the probabilities of all the features together
-        for features in features:
+        for feature in features:
             p *= self.weighted_probability(feature, cat)
         return p
 
     def probability(self, document, cat):
         '''
+        Calculates the probability document is in cat
         '''
-        category_probability = float(self.category_count(cat)) / self.total_count()
+        category_probability = self.category_count(cat) / self.total_count()
         document_probability = self.document_probability(document, cat)
         return document_probability * category_probability
 
@@ -151,7 +178,7 @@ class Classifier(object):
         Set a threshold for cat to determine minimum differences in their
         probabilities in order to be classifed under a given category
         '''
-        self.threshold[cat] = threshold
+        self.thresholds[cat] = threshold
 
     def get_threshold(self, cat):
         '''
