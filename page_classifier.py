@@ -8,11 +8,13 @@ from nltk.tokenize import WhitespaceTokenizer
 from nltk import WordNetLemmatizer, FreqDist
 STOPWORDS = stopwords.words('english')
 import codecs, re
+import MySQLdb as mysql
+
 def get_words(document):
     '''
     Return a list of unique words in document
     '''
-    regex1 = re.compile('\(^[A-Za-z]\)*')          # match non-alphanumeric
+    regex1 = re.compile('\W')          # match non-alphanumeric
     regex2 = re.compile('&(#)*(\w)*;')  # match html entities
     regex3 = re.compile('( ){2,}')      # match more than 2 spaces
     lemmatizer = WordNetLemmatizer()
@@ -36,14 +38,28 @@ class Classifier(object):
     An implementation of a naive Bayes classifier based on the material from
     chapter 6 of O'Reilly's "Programming Collective Intelligence"
     '''
-    def __init__(self, get_features):
-        # keep track of the count for a given feature in each category
-        self.feat_count = { }
-        # keep track of the document count in each  category
-        self.cat_count  = { }
+    def __init__(self, get_features, db):
+        '''
+        Initializes the classifier with an empty feature count, category count,
+        thresholds, and a connection to the database.
+
+        The arguments:
+            - get_features: a function that takes a string or document and
+                            returns a list of features.
+            - db: a dictionary with the information to connect to the database
+                  where the classifier stores the trained model. This dict has
+                  the following keys: dbname, host, usr, passwd.
+        '''
+        # set our connection to the database
+        self.db = mysql.connect(
+                                host=db['host'],
+                                user=db['usr'],
+                                passwd=db['passwd'],
+                                db=db['dbname']
+                               )
+        self.cursor = self.db.cursor()
         # we set our function to extract features, we can use the same
-        # classifier
-        # for different kinds of features
+        # classifier for different kinds of features
         self.get_features = get_features
         # thresholds for making a final classification decision
         self.thresholds = { }
@@ -53,44 +69,104 @@ class Classifier(object):
         Increment the count of feat in cat. If cat doesn't exist for feature,
         add it and increment.
         '''
-        self.feat_count.setdefault(feat, {})
-        self.feat_count[feat].setdefault(cat, 0)
-        self.feat_count[feat][cat] += 1
+        # get the count
+        count = self.feature_count(feat, cat)
+        if count == 0:
+            # create record for this feature on this category
+            self.cursor.execute(
+                                '''
+                                INSERT INTO feature_tbl
+                                (feature, category, count) VALUES (%s, %s, %s)
+                                ''',
+                                (feat, cat, 1)
+                               )
+        else:
+            # update the count for feature in category
+            self.cursor.execute(
+                                '''
+                                UPDATE feature_tbl SET count=%s
+                                WHERE feature=%s AND category=%s
+                                ''',
+                                (count+1, feat, cat)
+                               )
+        self.db.commit()
 
     def increment_category(self, cat):
         '''
         Increment the count of a category
         '''
-        self.cat_count.setdefault(cat, 0)
-        self.cat_count[cat] += 1
+        # get the category count
+        count = self.category_count(cat)
+
+        if count == 0:
+            # create new record for category
+            self.cursor.execute(
+                                '''
+                                INSERT INTO category_tbl (category, count)
+                                VALUES (%s, %s)
+                                ''',
+                                (cat, 1)
+                               )
+        else:
+            # increment the count of the category
+            self.cursor.execute(
+                                '''
+                                UPDATE category_tbl SET count=%s
+                                WHERE category=%s
+                                ''',
+                                (count+1, cat)
+                               )
+        self.db.commit()
 
     def feature_count(self, feat, cat):
         '''
         Returns the number of counts feat is in cat
         '''
-        if feat in self.feat_count and cat in self.feat_count[feat]:
-            return float(self.feat_count[feat][cat])
-        return 0.0  # else return 0
+        self.cursor.execute(
+                            '''
+                            SELECT count FROM feature_tbl
+                            WHERE feature=%s AND category=%s
+                            ''',
+                            (feat, cat)
+                           )
+        result = self.cursor.fetchone()
+        if result == None:
+            return 0.0
+        else:
+            return float(result[0])
 
     def category_count(self, cat):
         '''
         Return the count of documents in cat
         '''
-        if cat in self.cat_count:
-            return float(self.cat_count[cat])
-        return 0.0
+        self.cursor.execute(
+                       '''
+                       SELECT count FROM category_tbl
+                       WHERE category=%s
+                       ''',
+                       (cat,)
+                      )
+        result = self.cursor.fetchone()
+        if result == None:
+            return 0.0
+        else:
+            return float(result[0])
 
     def total_count(self):
         '''
         Returns the total number of documents.
         '''
-        return sum(self.cat_count.values())
+        self.cursor.execute('''SELECT SUM(count) FROM category_tbl''')
+        total_document_count = int(self.cursor.fetchone()[0])
+        return total_document_count
 
     def categories(self):
         '''
         Returns a list of all categories
         '''
-        return self.cat_count.keys()
+        self.cursor.execute('''SELECT category FROM category_tbl''')
+        categories = [ category for category, in self.cursor.fetchall() ]
+        return categories
 
     def train(self, item, cat):
         '''
@@ -117,11 +193,13 @@ class Classifier(object):
 
     def reset_classifier(self):
         '''
-        Clears out feat_count and cat_count dictionaries. Very helpful for
-        testing and for use in the python shell
+        Clears out the feature and category tables as well as the thresholds
+        dictionary. Very helpful for testing and for use in the python shell
         '''
-        self.feat_count = { }
-        self.cat_count  = { }
+        # clear the feature and category tables in the DB
+        self.cursor.execute('''DELETE FROM feature_tbl''')
+        self.cursor.execute('''DELETE FROM category_tbl''')
+        self.db.commit()
         self.thresholds = { }
 
     # calculate probabilities

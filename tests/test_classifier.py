@@ -21,14 +21,20 @@ train_tech   = [
     'Scientists Turn to the Web to Raise Research Funds',
     'In Robotics, Human-Style Perception and Motion Are Elusive',
     ]
+
+try:
+    from config import DB
+except ImportError:
+    from my_config import DB
+
 class ClassifierTestCase(unittest.TestCase):
     '''
     Testing the classifier with data for two categories:
         - sports headlines
         - technology headlines
 
-    There is a list of 100 elements in each category, which will be split 70/30
-    using 70 elements to train the classifier on each category and the other 30
+    There is a list of 59 elements in each category, which will be split 50/9
+    using 50 elements to train the classifier on each category and the other 9
     to test the trained classifier.
     '''
 
@@ -36,7 +42,7 @@ class ClassifierTestCase(unittest.TestCase):
         '''
         Create the classifier
         '''
-        self.classifier = Classifier(get_words)
+        self.classifier = Classifier(get_words, DB)
 
     def print_features(self):
         '''
@@ -47,62 +53,64 @@ class ClassifierTestCase(unittest.TestCase):
             print feat,'-----------\t',categories
 
     def test_train_from_file(self):
-        '''
-        '''
-        # test training for a single category at first
-        # train with 4 sports headlines
-        self.classifier.train_from_file('data/small_train_sports', 'sports')
-        #self.print_features()
-        # make sure sports is in the list of categories
-        assert 'sports' in self.classifier.categories()
-        self.classifier.reset_classifier()
+         '''
+         Load a file with a list of headlines and run their contents through the
+         trainining process.
+         '''
+         # test training for a single category at first
+         # train with 4 sports headlines
+         self.classifier.train_from_file('data/small_train_sports', 'sports')
+         #self.print_features()
+         # make sure sports is in the list of categories
+         assert 'sports' in self.classifier.categories()
+         self.classifier.reset_classifier()
 
-        # train with 4 technology headlines
-        self.classifier.train_from_file('data/small_train_tech', 'technology')
-        #self.print_features()
-        # make sure technology is in the list of categories
-        assert 'technology' in self.classifier.categories()
-        self.classifier.reset_classifier()
+         # train with 4 technology headlines
+         self.classifier.train_from_file('data/small_train_tech', 'technology')
+         #self.print_features()
+         # make sure technology is in the list of categories
+         assert 'technology' in self.classifier.categories()
+         self.classifier.reset_classifier()
 
-        # test training for 2 categories
-        self.classifier.train_from_file('data/small_train_sports', 'sports')
-        self.classifier.train_from_file('data/small_train_tech', 'technology')
-        assert 'sports' in self.classifier.categories()
-        assert 'technology' in self.classifier.categories()
-        #self.print_features()
+         # test training for 2 categories
+         self.classifier.train_from_file('data/small_train_sports', 'sports')
+         self.classifier.train_from_file('data/small_train_tech', 'technology')
+         assert 'sports' in self.classifier.categories()
+         assert 'technology' in self.classifier.categories()
+         #self.print_features()
 
     def test_feature_count(self):
-        '''
-        Test feature count by training classifier with a small listing of sport
-        headlines, then look for a few features with known counts and see what
-        their count is in the feature dictionary. Do it also for a single training
-        item.
-        '''
-        sports_item = 'SPORTS OF THE TIMES; When Americans Are Involved, Fate Can be Fluid'
-        tech_item   = 'Scientists Turn to the Web to Raise Research Funds'
-        items_and_category = [
-                              (sports_item, 'sports'),
-                              (tech_item, 'technology')
-                             ]
-        for item, category in items_and_category:
-            self.classifier.train(item, category)
-            item_words = get_words(item).keys()
-            for word in item_words:
-                assert self.classifier.feature_count(word, category) == float(item_words.count(word))
+         '''
+         Test feature count by training classifier with a small listing of sport
+         headlines, then look for a few features with known counts and see what
+         their count is in the feature dictionary. Do it also for a single training
+         item.
+         '''
+         sports_item = 'SPORTS OF THE TIMES; When Americans Are Involved, Fate Can be Fluid'
+         tech_item   = 'Scientists Turn to the Web to Raise Research Funds'
+         items_and_category = [
+                               (sports_item, 'sports'),
+                               (tech_item, 'technology')
+                              ]
+         for item, category in items_and_category:
+             self.classifier.train(item, category)
+             item_words = get_words(item).keys()
+             for word in item_words:
+                 assert self.classifier.feature_count(word, category) == float(item_words.count(word))
 
     def test_category_count(self):
-        '''
-        Train from small training files and check the count is equal to
-        the size of the file
-        '''
-        #self.classifier.train_from_file('small_train_sports', 'sports')
-        #self.classifier.train_from_file('data/small_train_tech', 'technology')
-        training_data = [(train_sports, 'sports'), (train_tech, 'technology')]
-        for data, category in training_data:
-            f = lambda x: self.classifier.train(x, category)
-            map(f, data)
-        assert self.classifier.category_count('sports') == 4
-        assert self.classifier.category_count('technology') == 4
+         '''
+         Train from small training files and check the count is equal to
+         the size of the file
+         '''
+         #self.classifier.train_from_file('small_train_sports', 'sports')
+         #self.classifier.train_from_file('data/small_train_tech', 'technology')
+         training_data = [(train_sports, 'sports'), (train_tech, 'technology')]
+         for data, category in training_data:
+             f = lambda x: self.classifier.train(x, category)
+             map(f, data)
+         assert self.classifier.category_count('sports') == 4
+         assert self.classifier.category_count('technology') == 4
 
     def test_feature_probability(self):
         '''
@@ -114,7 +122,7 @@ class ClassifierTestCase(unittest.TestCase):
         Traing with training sets. Then look at the classification results for
         our data for which we know its category.
         '''
-        self.classifier = Classifier(simple_get_words)
+        self.classifier = Classifier(simple_get_words, DB)
         training_data = [(train_sports, 'sports'), (train_tech, 'technology')]
         for data, category in training_data:
             f = lambda x: self.classifier.train(x, category)
@@ -135,7 +143,7 @@ class ClassifierTestCase(unittest.TestCase):
 
     def test_classify_large(self):
         '''
-        Test classification with a larger data set, split 90/10 for training/test
+        Test classification with a larger data set, split 50/9 for training/test
         '''
         # training step
         train_tech  = 'data/train_tech'
@@ -157,7 +165,7 @@ class ClassifierTestCase(unittest.TestCase):
     def tearDown(self):
         '''
         '''
-        pass
+        self.classifier.reset_classifier()
 
 if __name__ == '__main__':
     unittest.main()
