@@ -1,0 +1,11 @@
+{% extends "layout.html" %}
+{% block title %}Is it X {% endblock %}
+{% block content %}
+<div align="center">
+	<form id="url_form" method="post" action="{{ url_for('classify') }}">
+		is
+		<input type="text" name="domain" id="domain_url" value="samuraihippo.com">
+		<a href="#" id="classify">x</a> ?
+	</form>
+</div>
+{% endblock %}

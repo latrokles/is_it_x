@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+{% block title %}{% endblock %}
+{% block content %}
+<div align="center" id="result">
+	<table>
+		<tr>
+			<td colspan="2">
+				<b>URL to check is</b>: {{ url }} <br>
+				<h3>{{ message }}</h3>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				<center>
+					<a href="#" id="visit">visit page</a>
+				</center>
+			</td>
+			<td>
+				<center>
+					<a href="#" id="close_page">close page</a>
+				</center>
+			</td>
+		</tr>
+	</table>
+</div>
+<div align="center" id="visit_page">
+</div>
+{% endblock %}

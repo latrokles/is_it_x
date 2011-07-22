@@ -7,7 +7,7 @@ from nltk.corpus import stopwords
 from nltk.tokenize import WhitespaceTokenizer
 from nltk import WordNetLemmatizer, FreqDist
 STOPWORDS = stopwords.words('english')
-import codecs, re
+import codecs, re, math
 import MySQLdb as mysql
 
 def get_words(document):
@@ -97,7 +97,6 @@ class Classifier(object):
         '''
         # get the category count
         count = self.category_count(cat)
-
         if count == 0:
             # create new record for category
             self.cursor.execute(
@@ -186,10 +185,10 @@ class Classifier(object):
         the classifier with them.
         '''
         lines = [ ]
-        with codecs.open(filename, 'r', 'utf-8') as file:
+        with open(filename, 'r') as file:
             lines = file.readlines()
-        for item in lines:
-            self.train(item.strip('\n'), cat)
+            for item in lines:
+                self.train(item, cat)
 
     def reset_classifier(self):
         '''
@@ -239,7 +238,9 @@ class Classifier(object):
         p = 1
         # multiply the probabilities of all the features together
         for feature in features:
-            p *= self.weighted_probability(feature, cat)
+            wp = self.weighted_probability(feature, cat)
+            #p *= wp
+            p += math.log(wp)
         return p
 
     def probability(self, document, cat):
@@ -271,17 +272,19 @@ class Classifier(object):
         Find what category document falls into
         '''
         probabilities = { }
-        max = 0.0
+        #max = 0.0
         # get category with highest probability for document
         for category in self.categories():
             probabilities[category] = self.probability(document, category)
-            if probabilities[category] > max:
-                max = probabilities[category]
-                best = category
+            #print 'Probablity document is in %s: %f' % (category, probabilities[category])
+            #if probabilities[category] > max:
+            #    max = probabilities[category]
+            #    best = category
+        best = max(probabilities, key=probabilities.get)
         # check that probability exceeds the threshold * next best category
-        for category, probability in probabilities.items():
-            if category == best:
-                continue
-            if probability * self.get_threshold(best) > probabilities[best]:
-                return None
+        #for category, probability in probabilities.items():
+        #    if category == best:
+        #        continue
+        #    if probability * self.get_threshold(best) > probabilities[best]:
+        #        return None
         return best

@@ -1,0 +1,43 @@
+<!doctype html>
+<html>
+	<head>
+		<title>{% block title %}{% endblock %}</title>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.14/jquery-ui.min.js"></script>
+        <link rel="stylesheet" href="/static/css/style.css" type="text/css" media="screen, projection">
+	<link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+	<script>
+		$(document).ready(function(){
+			$('#close_page').hide();
+			
+			$('#visit').one('click', function(event){
+				$('<iframe id="page" src="{{ url }}" width="80%" height="300">').appendTo('#visit_page');
+                    		$('#close_page').show();
+                	});
+			
+			$('#close_page').click(function(event){
+                    		var element = document.getElementById("page");
+                    		element.parentElement.removeChild(element);
+                    		$('#close_page').hide();
+                	});
+			
+			$('#classify').click(function(event){
+		    		$('form#url_form').submit();
+	    		});
+
+			$('#domain_url').click(function(event){
+				var element = document.getElementById("domain_url");
+				element.value = '';
+			});
+
+		});
+	</script>
+	</head>
+	<body>
+		<div class="container">
+		{% block content %}
+		{% endblock %}
+		</div>
+	</body>
+</html>
+
